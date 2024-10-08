@@ -90,13 +90,35 @@ async function run() {
     };
 
     // Create User to store into database
-    
+    app.post("/users", async (request, response) => {
+      const user = request.body;
+      const emailQuery = { email: user.email };
+      const companyQuery = { company_name: user.company_name };
+      const role = user.role;
 
-    // Get Users
-    app.get("/users", verifyToken, verifyHR, async (request, response) => {
-      const result = await usersCollection.find().toArray();
+      const existingUser = await usersCollection.findOne(emailQuery);
+      const existingCompany = await usersCollection.findOne(companyQuery);
+
+      if (existingUser) {
+        return response.send({
+          message: "User Already Exists!",
+          insertedId: null,
+        });
+      }
+
+      if (role == "hr" && existingCompany) {
+        return response.send({
+          message: "Company Name Already Exists!",
+          insertedId: null,
+        });
+      }
+
+      const result = await usersCollection.insertOne(user);
       response.send(result);
     });
+
+    // Make Api to get all users 
+    
 
     // Make Api to get HR User
     app.get("/users/hr/:email", async (request, response) => {

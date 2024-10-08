@@ -118,19 +118,13 @@ async function run() {
     });
 
     // Make Api to get all users 
-    
+    app.get("/users", verifyToken, verifyHR, async (request, response) => {
+      const result = await usersCollection.find().toArray();
+      response.send(result);
+    });
 
     // Make Api to get HR User
-    app.get("/users/hr/:email", async (request, response) => {
-      const email = request.params.email;
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      let hr = false;
-      if (user) {
-        hr = user?.role === "hr";
-      }
-      response.send({ hr });
-    });
+    
 
     // Employee User
     app.get("/users/employee/:email", async (request, response) => {

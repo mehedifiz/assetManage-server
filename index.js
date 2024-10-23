@@ -136,15 +136,19 @@ async function run() {
     });
 
     // Make Api to get Employee User
-    
-
-    // Get An User Data
-    app.get("/users/:email", async (req, res) => {
-      const email = req.params.email;
+    app.get("/users/employee/:email", async (request, response) => {
+      const email = request.params.email;
       const query = { email: email };
       const user = await usersCollection.findOne(query);
-      res.send(user);
+      let employee = false;
+      if (user) {
+        employee = user?.role === "employee";
+      }
+      response.send({ employee });
     });
+
+    // Get An specific or login  User Data
+    
 
     // Update User Name
     app.patch("/users", verifyToken, async (req, res) => {

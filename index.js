@@ -124,19 +124,19 @@ async function run() {
     });
 
     // Make Api to get HR User
-    
-
-    // Employee User
-    app.get("/users/employee/:email", async (request, response) => {
+    app.get("/users/hr/:email", async (request, response) => {
       const email = request.params.email;
       const query = { email: email };
       const user = await usersCollection.findOne(query);
-      let employee = false;
+      let hr = false;
       if (user) {
-        employee = user?.role === "employee";
+        hr = user?.role === "hr";
       }
-      response.send({ employee });
+      response.send({ hr });
     });
+
+    // Make Api to get Employee User
+    
 
     // Get An User Data
     app.get("/users/:email", async (req, res) => {

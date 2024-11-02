@@ -169,21 +169,22 @@ async function run() {
     });
 
     // Add An User To the Company
-    
-
-    // Remove An User From the Company
     app.patch("/users/:id", verifyToken, verifyHR, async (req, res) => {
       const id = req.params.id;
+      const { company_name, company_logo } = req.body;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
-        $unset: {
-          company_name: "",
-          company_logo: "",
+        $set: {
+          company_name,
+          company_logo,
         },
       };
       const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
+
+    // Remove An User From the Company
+    
 
     // Get Users by Company Name
     app.get(

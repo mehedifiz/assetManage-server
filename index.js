@@ -147,8 +147,13 @@ async function run() {
       response.send({ employee });
     });
 
-    // Get An specific or login  User Data
-    
+    // Make Api to get specific or login  user data
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      res.send(user);
+    });
 
     // Update User Name
     app.patch("/users", verifyToken, async (req, res) => {
@@ -164,19 +169,7 @@ async function run() {
     });
 
     // Add An User To the Company
-    app.patch("/users/:id", verifyToken, verifyHR, async (req, res) => {
-      const id = req.params.id;
-      const { company_name, company_logo } = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          company_name,
-          company_logo,
-        },
-      };
-      const result = await usersCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+    
 
     // Remove An User From the Company
     app.patch("/users/:id", verifyToken, verifyHR, async (req, res) => {

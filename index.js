@@ -276,9 +276,13 @@ async function run() {
     });
 
     // Make Api to Get A Single Asset
-    
+    app.get("/assets/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const asset = await assetsCollection.findOne({ _id: new ObjectId(id) });
+      res.send(asset);
+    });
 
-    // Update an Asset
+    // Make Api to Update an Asset
     app.put("/assets/:id", verifyToken, verifyHR, async (req, res) => {
       const id = req.params.id;
       const assetUpdates = req.body;
@@ -593,22 +597,8 @@ async function run() {
       }
     );
 
-    // Payment
-    app.post("/create-payment-intent", verifyToken, async (req, res) => {
-      const { price } = req.body;
-      const amount = parseInt(price * 100);
-      console.log(amount, "amount inside the intent");
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: "usd",
-        payment_method_types: ["card"],
-      });
-
-      res.send({
-        clientSecret: paymentIntent.client_secret,
-      });
-    });
+    // Create Payment Intent
+    
 
     app.post("/payments", verifyToken, verifyHR, async (req, res) => {
       const payment = req.body;

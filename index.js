@@ -198,14 +198,19 @@ async function run() {
     });
 
     // Get Users by Company Name
-    
+    app.get(
+      "/users/company/:company_name",
+      verifyToken,
+      async (request, response) => {
+        const companyName = request.params.company_name;
+        const query = { company_name: companyName };
+        const users = await usersCollection.find(query).toArray();
+        response.send(users);
+      }
+    );
 
-    // Add Asset
-    app.post("/assets", verifyToken, verifyHR, async (req, res) => {
-      const asset = req.body;
-      const result = await assetsCollection.insertOne(asset);
-      res.send(result);
-    });
+    // Make Api to store an Asset to database
+    
 
     // Get Assets
     app.get("/assets", verifyToken, async (req, res) => {

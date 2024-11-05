@@ -217,7 +217,44 @@ async function run() {
     });
 
     // Make Api to Get Assets
-    
+    app.get("/assets", verifyToken, async (req, res) => {
+      const { search, filter } = req.query;
+      const userEmail = req.decoded.email;
+
+      try {
+        const user = await usersCollection.findOne({ email: userEmail });
+
+        if (!user || !user.company_name) {
+          return res.status(400).send("User company not found");
+        }
+
+        const userCompany = user.company_name;
+
+        let query = { company_name: userCompany };
+
+        if (search) {
+          query.product_name = { $regex: search, $options: "i" };
+        }
+
+        if (filter) {
+          if (filter === "Available") {
+            query.product_quantity = { $gt: 0 };
+          } else if (filter === "Out Of Stock") {
+            query.product_quantity = 0;
+          } else if (filter === "Returnable") {
+            query.product_type = "Returnable";
+          } else if (filter === "Non-Returnable") {
+            query.product_type = "Non-Returnable";
+          }
+        }
+
+        const assets = await assetsCollection.find(query).toArray();
+        res.send(assets);
+      } catch (error) {
+        console.error("Error fetching assets:", error);
+        res.status(500).send("Error fetching assets");
+      }
+    });
 
     // Get Assets with limited stock by company name
     app.get("/assets/limited-stock/:company_name", async (req, res) => {
@@ -238,12 +275,8 @@ async function run() {
       }
     });
 
-    // Get A Single Asset
-    app.get("/assets/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const asset = await assetsCollection.findOne({ _id: new ObjectId(id) });
-      res.send(asset);
-    });
+    // Make Api to Get A Single Asset
+    
 
     // Update an Asset
     app.put("/assets/:id", verifyToken, verifyHR, async (req, res) => {

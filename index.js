@@ -39,14 +39,8 @@ async function run() {
       .db("assetDB")
       .collection("requestedAssets");
 
-    // JWT
-    app.post("/jwt", async (request, response) => {
-      const user = request.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "365d",
-      });
-      response.send({ token });
-    });
+    // JWT related Api
+    
 
     // Verify Token
     const verifyToken = (request, response, next) => {
@@ -598,7 +592,21 @@ async function run() {
     );
 
     // Create Payment Intent
-    
+    app.post("/create-payment-intent", verifyToken, async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount, "amount inside the intent");
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
 
     app.post("/payments", verifyToken, verifyHR, async (req, res) => {
       const payment = req.body;

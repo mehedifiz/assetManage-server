@@ -184,19 +184,21 @@ async function run() {
     });
 
     // Remove An User From the Company
-    
+    app.patch("/users/:id", verifyToken, verifyHR, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $unset: {
+          company_name: "",
+          company_logo: "",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
 
     // Get Users by Company Name
-    app.get(
-      "/users/company/:company_name",
-      verifyToken,
-      async (request, response) => {
-        const companyName = request.params.company_name;
-        const query = { company_name: companyName };
-        const users = await usersCollection.find(query).toArray();
-        response.send(users);
-      }
-    );
+    
 
     // Add Asset
     app.post("/assets", verifyToken, verifyHR, async (req, res) => {

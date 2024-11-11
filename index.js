@@ -5,10 +5,10 @@ require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 2000;
 
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://asset-management-c4990.web.app"],
+  origin: ["http://localhost:5173","http://localhost:5174", "https://assetmanage.web.app"],
   credentials: true,
   optionSuccessStatus: 200,
 };
@@ -16,7 +16,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // MongoDB Starts Here
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.pbz3kui.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri =`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ensactw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 console.log(uri);
 
@@ -31,24 +31,31 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
+    await client.connect();
     // Collections
     const usersCollection = client.db("assetDB").collection("users");
     const paymentCollection = client.db("assetDB").collection("payments");
     const assetsCollection = client.db("assetDB").collection("assets");
-    const requestedAssetsCollection = client
-      .db("assetDB")
-      .collection("requestedAssets");
+    const requestedAssetsCollection = client.db("assetDB").collection("requestedAssets");
 
     // JWT related Api
+    app.post('/jwt' , async(req , res )=>{
+      const user = req.body;
+      const token = jwt.sign(user , process.env.ACCESS_TOKEN_SECRET ,{
+        expiresIn:'1h'})
+
+      res.send({token})
+    })
     
 
     // Verify Token
-    const verifyToken = (request, response, next) => {
-      // console.log("vToken", request.headers.authorization);
+    const  verifyToken  = (request, response, next) => {
+      console.log("vToken", request.headers.authorization);
       if (!request.headers.authorization) {
         return response.status(401).send({ message: "forbidden access 1" });
       }
       const token = request.headers.authorization.split(" ")[1];
+      console.log(token)
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
         if (err) {
           console.log(err);
@@ -84,7 +91,7 @@ async function run() {
     };
 
     // Create User to store into database
-    app.post("/users", async (request, response) => {
+    app.post("/users",  async (request, response) => {
       const user = request.body;
       const emailQuery = { email: user.email };
       const companyQuery = { company_name: user.company_name };
@@ -112,13 +119,14 @@ async function run() {
     });
 
     // Make Api to get all users 
-    app.get("/users", verifyToken, verifyHR, async (request, response) => {
+    app.get("/users", verifyToken , verifyHR,  async (request, response) => {
       const result = await usersCollection.find().toArray();
       response.send(result);
     });
 
     // Make Api to get HR User
     app.get("/users/hr/:email", async (request, response) => {
+      console.log('user/hr;email')
       const email = request.params.email;
       const query = { email: email };
       const user = await usersCollection.findOne(query);
@@ -130,8 +138,10 @@ async function run() {
     });
 
     // Make Api to get Employee User
-    app.get("/users/employee/:email", async (request, response) => {
+    app.get("/users/employee/:email",  async (request, response) => {
       const email = request.params.email;
+      console.log('user/hr;email')
+
       const query = { email: email };
       const user = await usersCollection.findOne(query);
       let employee = false;
@@ -150,7 +160,7 @@ async function run() {
     });
 
     // Update User Name
-    app.patch("/users", verifyToken, async (req, res) => {
+    app.patch("/users",verifyToken, async (req, res) => {
       const { email, name } = req.body;
       const filter = { email };
       const updateDoc = {
@@ -163,7 +173,7 @@ async function run() {
     });
 
     // Add An User To the Company
-    app.patch("/users/:id", verifyToken, verifyHR, async (req, res) => {
+    app.patch("/users/:id", verifyToken, verifyHR,  async (req, res) => {
       const id = req.params.id;
       const { company_name, company_logo } = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -178,7 +188,7 @@ async function run() {
     });
 
     // Remove An User From the Company
-    app.patch("/users/:id", verifyToken, verifyHR, async (req, res) => {
+    app.patch("/users/:id",verifyToken, verifyHR,  async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -191,10 +201,17 @@ async function run() {
       res.send(result);
     });
 
+    app.post('/assets' ,verifyToken, async(req , res )=>{
+      const assetData = req.body;
+      console.log('assetData',assetData)
+      const result = await assetsCollection.insertOne(assetData);
+      res.send(result)
+    })
+
     // Get Users by Company Name
     app.get(
-      "/users/company/:company_name",
-      verifyToken,
+      "/users/company/:company_name",verifyToken,
+        
       async (request, response) => {
         const companyName = request.params.company_name;
         const query = { company_name: companyName };
@@ -203,33 +220,25 @@ async function run() {
       }
     );
 
-    // Make Api to store an Asset to database
-    app.post("/assets", verifyToken, verifyHR, async (req, res) => {
-      const asset = req.body;
-      const result = await assetsCollection.insertOne(asset);
-      res.send(result);
-    });
-
-    // Make Api to Get Assets
     app.get("/assets", verifyToken, async (req, res) => {
-      const { search, filter } = req.query;
-      const userEmail = req.decoded.email;
-
+      const { search, filter, userEmail } = req.query; // Get userEmail from query parameters
+      console.log("User Email:", userEmail);
+    
       try {
         const user = await usersCollection.findOne({ email: userEmail });
-
+    
         if (!user || !user.company_name) {
           return res.status(400).send("User company not found");
         }
-
+    
         const userCompany = user.company_name;
-
+    
         let query = { company_name: userCompany };
-
+    
         if (search) {
           query.product_name = { $regex: search, $options: "i" };
         }
-
+    
         if (filter) {
           if (filter === "Available") {
             query.product_quantity = { $gt: 0 };
@@ -241,7 +250,7 @@ async function run() {
             query.product_type = "Non-Returnable";
           }
         }
-
+    
         const assets = await assetsCollection.find(query).toArray();
         res.send(assets);
       } catch (error) {
@@ -249,9 +258,10 @@ async function run() {
         res.status(500).send("Error fetching assets");
       }
     });
-
+    
+    
     // Get Assets with limited stock by company name
-    app.get("/assets/limited-stock/:company_name", async (req, res) => {
+    app.get("/assets/limited-stock/:company_name",  async (req, res) => {
       const companyName = req.params.company_name;
 
       try {
@@ -270,14 +280,14 @@ async function run() {
     });
 
     // Make Api to Get A Single Asset
-    app.get("/assets/:id", verifyToken, async (req, res) => {
+    app.get("/assets/:id", verifyToken,   async (req, res) => {
       const id = req.params.id;
       const asset = await assetsCollection.findOne({ _id: new ObjectId(id) });
       res.send(asset);
     });
 
     // Make Api to Update an Asset
-    app.put("/assets/:id", verifyToken, verifyHR, async (req, res) => {
+    app.put("/assets/:id",  verifyToken, verifyHR,   async (req, res) => {
       const id = req.params.id;
       const assetUpdates = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -289,7 +299,7 @@ async function run() {
     });
 
     // Delete an asset by ID with company name verification
-    app.delete("/assets/:id", verifyToken, verifyHR, async (req, res) => {
+    app.delete("/assets/:id",verifyToken, verifyHR,     async (req, res) => {
       const id = req.params.id;
       const asset = await assetsCollection.findOne({ _id: new ObjectId(id) });
       const result = await assetsCollection.deleteOne({
@@ -299,127 +309,92 @@ async function run() {
     });
 
     // Add Request for an Asset
-    app.post(
-      "/requested-assets",
-      verifyToken,
-      verifyEmployee,
-      async (req, res) => {
-        const requestedAsset = req.body;
-
-        const session = client.startSession();
-        session.startTransaction();
-
-        try {
-          const { asset_id } = requestedAsset;
-
-          // Find the asset to check its current quantity
-          const asset = await assetsCollection.findOne(
-            { _id: new ObjectId(asset_id) },
-            { session }
-          );
-
-          if (!asset) {
-            throw new Error("Asset not found");
-          }
-
-          const productQuantity = parseInt(asset.product_quantity);
-          if (isNaN(productQuantity) || productQuantity === 0) {
-            throw new Error("Asset is out of stock or has an invalid quantity");
-          }
-
-          // Insert the requested asset into the collection
-          const insertResult = await requestedAssetsCollection.insertOne(
-            requestedAsset,
-            { session }
-          );
-
-          if (insertResult.insertedId) {
-            // Decrease the quantity of the asset in the assets collection
-            const assetResult = await assetsCollection.updateOne(
-              { _id: new ObjectId(asset_id) },
-              { $inc: { product_quantity: -1 } },
-              { session }
-            );
-
-            if (assetResult.modifiedCount === 1) {
-              await session.commitTransaction();
-              res.send(insertResult);
-            } else {
-              throw new Error("Failed to update asset quantity");
-            }
-          } else {
-            throw new Error("Failed to insert requested asset");
-          }
-        } catch (error) {
-          console.error("Transaction error:", error);
-          await session.abortTransaction();
-          res.status(500).send({ message: error.message });
-        } finally {
-          session.endSession();
+    app.post("/requested-assets",  verifyToken,
+      verifyEmployee, async (req, res) => {
+      const requestedAsset = req.body;
+      console.log(requestedAsset);
+    
+      try {
+        const { asset_id } = requestedAsset;
+    
+        // Find the asset to check its current quantity
+        const asset = await assetsCollection.findOne({ _id: new ObjectId(asset_id) });
+    
+        if (!asset) {
+          return res.status(404).send({ message: "Asset not found" });
         }
+    
+        const productQuantity = parseInt(asset.product_quantity);
+        if (isNaN(productQuantity) || productQuantity === 0) {
+          return res.status(400).send({ message: "Asset is out of stock or has an invalid quantity" });
+        }
+    
+        // Insert the requested asset into the collection
+        const insertResult = await requestedAssetsCollection.insertOne(requestedAsset);
+    
+        if (insertResult.insertedId) {
+          // Decrease the quantity of the asset in the assets collection
+          const assetResult = await assetsCollection.updateOne(
+            { _id: new ObjectId(asset_id) },
+            { $inc: { product_quantity: -1 } }
+          );
+    
+          if (assetResult.modifiedCount === 1) {
+            res.send(insertResult);
+          } else {
+            throw new Error("Failed to update asset quantity");
+          }
+        } else {
+          throw new Error("Failed to insert requested asset");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        res.status(500).send({ message: error.message });
       }
-    );
+    });
+    
 
     // Approved or Rejected
-    app.put(
-      "/requested-assets/:id",
-      verifyToken,
-      verifyHR,
-      async (req, res) => {
-        const { id } = req.params;
-        const { status } = req.body;
-
-        const session = client.startSession();
-        session.startTransaction();
-
-        try {
-          const requestedAsset = await requestedAssetsCollection.findOne(
-            { _id: new ObjectId(id) },
-            { session }
-          );
-
-          if (!requestedAsset) {
-            throw new Error("Requested asset not found");
-          }
-
-          // Prepare the update document
-          const updateDoc = { $set: { status } };
-          if (status === "Approved") {
-            updateDoc.$set.approval_date = new Date();
-          }
-
-          // Update the status (and approval_date if approved) of the requested asset
-          const updateResult = await requestedAssetsCollection.updateOne(
-            { _id: new ObjectId(id) },
-            updateDoc,
-            { session }
-          );
-
-          if (status === "Rejected") {
-            // Increment the asset quantity if the status is Rejected
-            const assetResult = await assetsCollection.updateOne(
-              { _id: new ObjectId(requestedAsset.asset_id) },
-              { $inc: { product_quantity: 1 } },
-              { session }
-            );
-
-            if (assetResult.modifiedCount !== 1) {
-              throw new Error("Failed to update asset quantity");
-            }
-          }
-
-          await session.commitTransaction();
-          res.send(updateResult);
-        } catch (error) {
-          console.error("Transaction error:", error);
-          await session.abortTransaction();
-          res.status(500).send({ message: error.message });
-        } finally {
-          session.endSession();
+    app.put("/requested-assets/:id",verifyToken,
+      verifyHR, async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
+    
+      try {
+        const requestedAsset = await requestedAssetsCollection.findOne({ _id: new ObjectId(id) });
+    
+        if (!requestedAsset) {
+          return res.status(404).send({ message: "Requested asset not found" });
         }
+    
+        // Prepare the update document
+        const updateDoc = { $set: { status } };
+        if (status === "Approved") {
+          updateDoc.$set.approval_date = new Date();
+        }
+    
+        // Update the status and possibly the approval_date of the requested asset
+        const updateResult = await requestedAssetsCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
+    
+        if (status === "Rejected") {
+          // Increment the asset quantity if the status is Rejected
+          const assetResult = await assetsCollection.updateOne(
+            { _id: new ObjectId(requestedAsset.asset_id) },
+            { $inc: { product_quantity: 1 } }
+          );
+    
+          if (assetResult.modifiedCount !== 1) {
+            return res.status(500).send({ message: "Failed to update asset quantity" });
+          }
+        }
+    
+        res.send(updateResult);
+      } catch (error) {
+        console.error("Error updating asset request:", error);
+        res.status(500).send({ message: error.message });
       }
-    );
-
+    });
+    
     // Get All Requested Assets
     app.get("/requested-assets", async (req, res) => {
       const { email, company_name } = req.query;
@@ -439,7 +414,7 @@ async function run() {
     });
 
     // Get All Requested Assets By Employee
-    app.get("/filtered-requested-assets", verifyToken, async (req, res) => {
+    app.get("/filtered-requested-assets", verifyToken,   async (req, res) => {
       const { company_name, assetName, status, assetType } = req.query;
       const query = {};
 
@@ -480,9 +455,10 @@ async function run() {
 
     // Cancel a Requested Asset
     app.put(
-      "/requested-assets/:id/cancel",
-      verifyToken,
+      "/requested-assets/:id/cancel", verifyToken,
       verifyEmployee,
+        
+       
       async (req, res) => {
         const { id } = req.params;
 
@@ -534,9 +510,10 @@ async function run() {
 
     // Return a Requested Asset
     app.put(
-      "/requested-assets/:id/return",
-      verifyToken,
+      "/requested-assets/:id/return",   verifyToken,
       verifyEmployee,
+        
+      
       async (req, res) => {
         const { id } = req.params;
 
@@ -592,7 +569,7 @@ async function run() {
     );
 
     // Create Payment Intent
-    app.post("/create-payment-intent", verifyToken, async (req, res) => {
+    app.post("/create-payment-intent",verifyToken, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       console.log(amount, "amount inside the intent");
@@ -608,51 +585,49 @@ async function run() {
       });
     });
 
-    app.post("/payments", verifyToken, verifyHR, async (req, res) => {
-      const payment = req.body;
-
-      const session = client.startSession();
-      session.startTransaction();
-
+    app.post('/payments', verifyToken, verifyHR,  async (req, res) => {
       try {
-        const paymentResult = await paymentCollection.insertOne(payment, {
-          session,
-        });
-
+        const payment = req.body;
+        
+        // Log the payment data for debugging
+        console.log('Payment Data:', payment);
+        
+        // Insert the payment record into the payment collection
+        const paymentResult = await paymentCollection.insertOne(payment);
+        console.log('Payment Inserted:', paymentResult);
+    
+        // Prepare to update the user's payment status
         const filter = { email: payment.hr_email };
         const updateDoc = {
           $set: {
-            payment_status: true,
-            payment_info: {
-              transactionId: payment.transactionId,
-              payment_from_company: payment.payment_from_company,
-              payment_for_package: payment.payment_for_package,
-              date: payment.date,
-              price: payment.price,
-            },
+            payment_status: payment.payment_status, // true
           },
         };
-
-        const userResult = await usersCollection.updateOne(filter, updateDoc, {
-          session,
-        });
-
+        console.log('Update Document:', updateDoc);
+    
+        // Update the user's payment status in the users collection
+        const userResult = await usersCollection.updateOne(filter, updateDoc);
+        console.log('User Updated:', userResult);
+    
+        // Check if both the payment insertion and user update were successful
         if (paymentResult.insertedId && userResult.modifiedCount === 1) {
-          await session.commitTransaction();
-          res.send({ paymentResult });
+          res.send({ paymentResult, userResult });
         } else {
           throw new Error("Payment or user update failed");
         }
+    
       } catch (error) {
-        await session.abortTransaction();
-        res.status(500).send({ message: error.message });
-      } finally {
-        session.endSession();
+        // If any error occurs, log and send a 500 response
+        console.error('Error processing payment:', error);
+        res.status(500).send({ error: 'Internal Server Error' });
       }
     });
-
+    
+    
+    
     // Increase Limit
     app.put("/payments", verifyToken, verifyHR, async (req, res) => {
+       
       const {
         email,
         additionalLimit,
@@ -661,9 +636,9 @@ async function run() {
         payment_for_package,
         price,
       } = req.body;
-
+    
       console.log("Received payment update request:", req.body);
-
+    
       if (
         !email ||
         !transactionId ||
@@ -674,12 +649,10 @@ async function run() {
         console.error("Missing required fields in payment update request.");
         return res.status(400).send({ message: "Missing required fields." });
       }
-
-      const session = client.startSession();
-      session.startTransaction();
-
+    
       try {
         const filter = { email: email };
+        console.log('email :' ,filter)
         const updateDoc = {
           $set: {
             "payment_info.transactionId": transactionId,
@@ -687,21 +660,20 @@ async function run() {
             "payment_info.payment_for_package": payment_for_package,
             "payment_info.date": new Date(),
             "payment_info.price": price,
-            packages: payment_for_package, // Update the packages field
+            package: payment_for_package,  
           },
           $inc: {
             limit: additionalLimit,
           },
         };
-
-        const userResult = await usersCollection.updateOne(filter, updateDoc, {
-          session,
-        });
-
+        console.log("update doc" , updateDoc)
+    
+        const userResult = await usersCollection.updateOne(filter, updateDoc);
+    
         if (userResult.modifiedCount !== 1) {
           throw new Error("Failed to update user payment info");
         }
-
+    
         const payment = {
           hr_email: email,
           transactionId,
@@ -711,25 +683,21 @@ async function run() {
           price,
           payment_status: true,
         };
-
-        const paymentResult = await paymentCollection.insertOne(payment, {
-          session,
-        });
-
+        // console.log('payment put data ' , payment)
+    
+        const paymentResult = await paymentCollection.insertOne(payment);
+    
         if (!paymentResult.insertedId) {
           throw new Error("Failed to insert payment record");
         }
-
-        await session.commitTransaction();
+    
         res.send({ userResult, paymentResult });
       } catch (error) {
         console.error("Error processing payment update:", error);
-        await session.abortTransaction();
         res.status(500).send({ message: error.message });
-      } finally {
-        session.endSession();
       }
     });
+    
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

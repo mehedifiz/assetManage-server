@@ -714,7 +714,7 @@ run().catch(console.dir);
 // MongoDB Ends Here
 
 app.get("/", (req, res) => {
-  res.send("Server is Running");
+  res.send("vercel is Running");
 });
 app.listen(port, () => {
   console.log(`Running Port is : ${port}`);

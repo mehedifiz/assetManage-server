@@ -18,7 +18,7 @@ app.use(express.json());
 // MongoDB Starts Here
 const uri =`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ensactw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-console.log(uri);
+// console.log(uri);
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -31,7 +31,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     // Collections
     const usersCollection = client.db("assetDB").collection("users");
     const paymentCollection = client.db("assetDB").collection("payments");
@@ -96,6 +96,7 @@ async function run() {
       const emailQuery = { email: user.email };
       const companyQuery = { company_name: user.company_name };
       const role = user.role;
+      const photoURL = user.photoURL;
 
       const existingUser = await usersCollection.findOne(emailQuery);
       const existingCompany = await usersCollection.findOne(companyQuery);
@@ -700,7 +701,7 @@ async function run() {
     
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
